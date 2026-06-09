@@ -1,0 +1,47 @@
+# Files excluded from the Docker build context.
+# Keeps the image small and prevents leaking secrets or local-only files.
+
+# Dependencies
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build output
+dist
+dist-ssr
+build
+
+# Local env / secrets
+.env
+.env.*
+!.env.example
+
+# VCS / IDE
+.git
+.gitignore
+.gitattributes
+.github
+.vscode
+.idea
+.husky
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project-specific
+.atl
+*.log
+coverage
+
+# Docker / docs that should not be sent to the build daemon
+Dockerfile
+.dockerignore
+docker-compose.yml
+docker-compose.*.yml
+README.md
+db/README.md
