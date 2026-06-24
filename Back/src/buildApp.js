@@ -5,6 +5,7 @@ import { dbPlugin } from './plugins/db.js';
 import { healthRoutes } from './plugins/health.js';
 import { authRoutes } from './routes/auth.js';
 import { categoryRoutes } from './routes/categories.js';
+import { expenseRoutes } from './routes/expenses.js';
 import { attachRequestId, registerErrorHandler } from './errors.js';
 
 // Build (but do not start) a Fastify instance. Exported so tests can call
@@ -41,6 +42,7 @@ export async function buildApp() {
   await app.register(healthRoutes);
   await app.register(authRoutes);
   await app.register(categoryRoutes);
+  await app.register(expenseRoutes);
 
   return app;
 }
