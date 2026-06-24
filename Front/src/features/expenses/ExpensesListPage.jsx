@@ -1,104 +1,144 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useSession } from '../../store/SessionContext.jsx';
-import { deleteExpense, getUserExpenses } from '../../db/localStore.js';
-import { CATEGORIES, categoryName } from '../../db/categories.js';
+import { api, ApiError } from '../../api/client.js';
+import { CATEGORY_BY_ID } from '../../db/categories.js';
+// NOTE: src/db/categories.js will be DELETED in commit 8. Keep the
+// import here for now (commit 5 is a refactor, not a delete). The
+// next page rewrites (commits 6, 7) also keep it. The deletion in
+// commit 8 makes all these imports fail, which is intended — by then
+// every page should have been rewired to use the API's category list.
 
-function formatCurrency(n) {
+function formatAmount(n) {
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(n);
 }
 
+function formatDate(iso) {
+  // expenseDate is YYYY-MM-DD; display in es-AR locale without timezone shift.
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+
 export function ExpensesListPage() {
-  const { user } = useSession();
-  const [version, setVersion] = useState(0); // refresh after delete
-  const [categoryFilter, setCategoryFilter] = useState('all');
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
+  const [expenses, setExpenses] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [filterCategory, setFilterCategory] = useState('');
+  const [filterFrom, setFilterFrom] = useState('');
+  const [filterTo, setFilterTo] = useState('');
 
-  const expenses = useMemo(() => getUserExpenses(user.id), [user.id, version]);
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    const params = new URLSearchParams();
+    if (filterCategory) params.set('categoryId', filterCategory);
+    if (filterFrom) params.set('from', filterFrom);
+    if (filterTo) params.set('to', filterTo);
+    const qs = params.toString();
+    api
+      .get(`/api/expenses${qs ? `?${qs}` : ''}`)
+      .then((data) => {
+        if (!cancelled) setExpenses(data.expenses);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        if (err instanceof ApiError && err.status === 401) {
+          // PrivateRoute already redirected, but be defensive.
+          setError('No autorizado');
+        } else {
+          setError(err?.message || 'No se pudieron cargar los gastos');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [filterCategory, filterFrom, filterTo]);
 
-  const filtered = useMemo(() => {
-    return expenses.filter((e) => {
-      if (categoryFilter !== 'all' && String(e.category_id) !== String(categoryFilter)) return false;
-      if (from && e.expense_date < from) return false;
-      if (to && e.expense_date > to) return false;
-      return true;
-    });
-  }, [expenses, categoryFilter, from, to]);
+  const totalShown = useMemo(
+    () => expenses.reduce((acc, e) => acc + Number(e.amount || 0), 0),
+    [expenses],
+  );
 
-  function handleDelete(id) {
-    if (!confirm('¿Eliminar este gasto?')) return;
-    deleteExpense(id, user.id);
-    setVersion((v) => v + 1);
-  }
-
-  function clearFilters() {
-    setCategoryFilter('all');
-    setFrom('');
-    setTo('');
+  async function onDelete(id) {
+    if (!window.confirm('¿Eliminar este gasto?')) return;
+    try {
+      await api.delete(`/api/expenses/${id}`);
+      setExpenses((cur) => cur.filter((e) => e.id !== id));
+    } catch (err) {
+      window.alert(err?.message || 'No se pudo eliminar el gasto');
+    }
   }
 
   return (
-    <section className="page">
-      <header className="page__header">
+    <div className="expenses">
+      <div className="expenses__header">
         <h1>Gastos</h1>
         <Link to="/expenses/new" className="btn btn--primary">+ Nuevo gasto</Link>
-      </header>
+      </div>
 
-      <div className="filters">
+      <div className="expenses__filters">
         <div className="field">
           <label htmlFor="cat">Categoría</label>
-          <select id="cat" value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
-            <option value="all">Todas</option>
-            {CATEGORIES.map((c) => (
+          <select id="cat" value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
+            <option value="">Todas</option>
+            {Object.values(CATEGORY_BY_ID).map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
         </div>
         <div className="field">
           <label htmlFor="from">Desde</label>
-          <input id="from" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+          <input id="from" type="date" value={filterFrom} onChange={(e) => setFilterFrom(e.target.value)} />
         </div>
         <div className="field">
           <label htmlFor="to">Hasta</label>
-          <input id="to" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+          <input id="to" type="date" value={filterTo} onChange={(e) => setFilterTo(e.target.value)} />
         </div>
-        <button type="button" className="btn btn--ghost" onClick={clearFilters}>Limpiar</button>
       </div>
 
-      {filtered.length === 0 ? (
-        <p className="empty">No hay gastos para los filtros seleccionados.</p>
+      {error && <p className="form__error">{error}</p>}
+
+      {loading ? (
+        <p>Cargando…</p>
+      ) : expenses.length === 0 ? (
+        <p>No hay gastos para los filtros seleccionados.</p>
       ) : (
-        <div className="table-wrap">
-          <table className="table">
+        <>
+          <table className="expenses__table">
             <thead>
               <tr>
                 <th>Fecha</th>
                 <th>Categoría</th>
                 <th>Descripción</th>
                 <th className="num">Monto</th>
-                <th aria-label="Acciones" />
+                <th></th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((e) => (
+              {expenses.map((e) => (
                 <tr key={e.id}>
-                  <td>{e.expense_date}</td>
-                  <td>{categoryName(e.category_id)}</td>
+                  <td>{formatDate(e.expenseDate)}</td>
+                  <td>{CATEGORY_BY_ID[e.categoryId]?.name ?? 'Desconocida'}</td>
                   <td>{e.description || '—'}</td>
-                  <td className="num">{formatCurrency(e.amount)}</td>
-                  <td className="row-actions">
-                    <Link to={`/expenses/${e.id}`} className="btn btn--ghost btn--sm">Editar</Link>
-                    <button type="button" className="btn btn--danger btn--sm" onClick={() => handleDelete(e.id)}>
-                      Eliminar
-                    </button>
+                  <td className="num">{formatAmount(Number(e.amount))}</td>
+                  <td className="actions">
+                    <Link to={`/expenses/${e.id}`}>Editar</Link>
+                    <button type="button" onClick={() => onDelete(e.id)}>Eliminar</button>
                   </td>
                 </tr>
               ))}
             </tbody>
+            <tfoot>
+              <tr>
+                <td colSpan={3}>Total</td>
+                <td className="num">{formatAmount(totalShown)}</td>
+                <td></td>
+              </tr>
+            </tfoot>
           </table>
-        </div>
+        </>
       )}
-    </section>
+    </div>
   );
 }
