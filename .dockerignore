@@ -1,0 +1,33 @@
+# Repo-root .dockerignore.
+# Applied only when a build context is the repo root (currently: the `backend`
+# service in docker-compose.yml). The `frontend` service has its own context
+# (Front/) and reads Front/.dockerignore instead, so it is unaffected by this file.
+
+# Frontend subtree — backend doesn't need it.
+Front/
+
+# Tooling / VCS metadata not needed inside images.
+.atl/
+.git/
+.gitignore
+.gitattributes
+.github/
+openspec/
+
+# OS / editor noise.
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Build outputs and dependency dirs (defensive — Back/node_modules is
+# already excluded by Back/.dockerignore, but keep this for safety).
+node_modules
+coverage
+*.log
+
+# Local secrets — never bake them into an image.
+.env
+.env.*

@@ -1,7 +1,7 @@
 import Fastify from 'fastify';
 import cookie from '@fastify/cookie';
 import { config } from './config.js';
-import { dbPlugin } from './plugins/db.js';
+import { createPool } from './plugins/db.js';
 import { healthRoutes } from './plugins/health.js';
 import { authRoutes } from './routes/auth.js';
 import { categoryRoutes } from './routes/categories.js';
@@ -16,7 +16,13 @@ import { attachRequestId, registerErrorHandler } from './errors.js';
 //   1. request-id   — attachRequestId (onRequest hook sets req.requestId)
 //   2. error-handler — registerErrorHandler (must be registered BEFORE routes)
 //   3. env          — config.js is imported above, validates on first load
-//   4. db           — pg.Pool attached as `app.pg` (per-app, see plugins/db.js)
+//   4. db           — pg.Pool created at ROOT context and attached as `app.pg`.
+//                     Decorating here (instead of inside a registered plugin)
+//                     avoids Fastify's per-plugin encapsulation: every route
+//                     plugin registered afterwards is a SIBLING, not a child,
+//                     so a decorator set inside a sibling plugin would not be
+//                     visible to its peers. Decoration in the root scope makes
+//                     `app.pg` available to every subsequent plugin.
 //   5. cookie       — @fastify/cookie; provides req.cookies (no secret: tokens are DB-hashed, not signed)
 //   6. health       — public /healthz and /readyz
 //   7. routes       — auth (this PR); expenses/categories/dashboard (PR 4)
@@ -38,7 +44,15 @@ export async function buildApp() {
   attachRequestId(app);
   registerErrorHandler(app);
 
-  await app.register(dbPlugin);
+  // Create the pool and decorate `app.pg` at the root context so the
+  // decoration is visible to every sibling plugin registered below.
+  // The onClose hook guarantees the pool is drained when the app stops.
+  const pool = createPool();
+  app.decorate('pg', pool);
+  app.addHook('onClose', async () => {
+    await pool.end();
+  });
+
   await app.register(cookie, {});
   await app.register(healthRoutes);
   await app.register(authRoutes);

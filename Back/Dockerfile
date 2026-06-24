@@ -16,7 +16,8 @@ WORKDIR /app
 
 # Install ALL deps (including devDeps like vitest) for the test step inside this
 # stage. Production image will only get the prod deps via `npm ci --omit=dev`.
-COPY package.json package-lock.json ./
+# Build context is the repo root (see docker-compose.yml), so we COPY from Back/.
+COPY Back/package.json Back/package-lock.json ./
 RUN npm ci
 
 # Cache test results — not strictly needed, but cheap and makes the build
@@ -31,16 +32,15 @@ WORKDIR /app
 # migrate container (overkill for v1).
 RUN apk add --no-cache postgresql-client
 
-# Install prod-only deps
-COPY package.json package-lock.json ./
+# Install prod-only deps (from the build context root).
+COPY Back/package.json Back/package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
-# Copy the source
-COPY src/ ./src/
+# Copy the source (relative to the repo-root build context).
+COPY Back/src/ ./src/
 
-# Copy the SQL files for the migrate loop. The path is intentional: the
-# backend container does NOT have the repo's `db/` directory mounted, so we
-# have to COPY the files in at build time.
+# Copy the SQL files for the migrate loop. db/ is a sibling of Back/ in the
+# repo, so it lives at the build context root — not under Back/.
 COPY db/ ./db/
 
 # Drop privileges. node:20-alpine already has a `node` user.

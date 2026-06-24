@@ -15,8 +15,11 @@ services:
 
   backend:
     build:
-      context: Back
-      dockerfile: Dockerfile
+      # Context is the repo root so the Dockerfile can COPY ./db (sibling of Back/).
+      # The Dockerfile references Back/package.json, Back/src/, etc. relative to this root.
+      # The repo-root .dockerignore keeps Front/ and secrets out of the build context.
+      context: .
+      dockerfile: Back/Dockerfile
     image: financesrecord-backend:local
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-finances_user}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-finances_db}
