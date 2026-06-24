@@ -1,62 +1,96 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { createUser, findUserByEmail } from '../db/localStore.js';
-import { hashPassword, verifyPassword } from '../features/auth/crypto.js';
-
-const SESSION_KEY = 'fr.session';
+import { api, ApiError } from '../api/client.js';
 
 const SessionContext = createContext(null);
 
-function readStoredSession() {
-  try {
-    const raw = sessionStorage.getItem(SESSION_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
 export function SessionProvider({ children }) {
-  const [user, setUser] = useState(() => readStoredSession());
+  const [user, setUser] = useState(null);
+  // `bootstrapping` is true while we ask the backend whether the cookie
+  // is still valid. Routes wait on this flag so a logged-in user does
+  // not see a /login flash on page refresh.
+  const [bootstrapping, setBootstrapping] = useState(true);
 
   useEffect(() => {
-    if (user) {
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify(user));
-    } else {
-      sessionStorage.removeItem(SESSION_KEY);
-    }
-  }, [user]);
+    let cancelled = false;
+    (async () => {
+      try {
+        const { user } = await api.get('/api/auth/me');
+        if (!cancelled) setUser(user);
+      } catch (err) {
+        // 401 is expected when not logged in. Anything else is logged.
+        if (!(err instanceof ApiError) || err.status !== 401) {
+          // eslint-disable-next-line no-console
+          console.warn('session bootstrap failed:', err);
+        }
+        if (!cancelled) setUser(null);
+      } finally {
+        if (!cancelled) setBootstrapping(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const register = useCallback(async ({ name, email, password }) => {
-    if (findUserByEmail(email)) {
-      throw new Error('El email ya está en uso');
+    try {
+      const { user } = await api.post('/api/auth/register', { name, email, password });
+      setUser(user);
+      return user;
+    } catch (err) {
+      throw new Error(translateAuthError(err, 'No se pudo registrar'));
     }
-    const passwordHash = await hashPassword(password);
-    const created = createUser({ name, email, passwordHash });
-    const publicUser = { id: created.id, name: created.name, email: created.email };
-    setUser(publicUser);
-    return publicUser;
   }, []);
 
   const login = useCallback(async ({ email, password }) => {
-    const stored = findUserByEmail(email);
-    if (!stored) throw new Error('Email o contraseña incorrectos');
-    const ok = await verifyPassword(password, stored.password_hash);
-    if (!ok) throw new Error('Email o contraseña incorrectos');
-    const publicUser = { id: stored.id, name: stored.name, email: stored.email };
-    setUser(publicUser);
-    return publicUser;
+    try {
+      const { user } = await api.post('/api/auth/login', { email, password });
+      setUser(user);
+      return user;
+    } catch (err) {
+      throw new Error(translateAuthError(err, 'No se pudo iniciar sesión'));
+    }
   }, []);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    try {
+      await api.post('/api/auth/logout', {});
+    } catch (err) {
+      // Logout failures are non-fatal: clear local state regardless.
+      // eslint-disable-next-line no-console
+      console.warn('logout request failed:', err);
+    }
     setUser(null);
   }, []);
 
   const value = useMemo(
-    () => ({ user, isAuthenticated: !!user, register, login, logout }),
-    [user, register, login, logout]
+    () => ({ user, isAuthenticated: !!user, bootstrapping, register, login, logout }),
+    [user, bootstrapping, register, login, logout],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
+}
+
+// Map a backend ApiError code to a user-friendly Spanish string.
+// The Login/Register pages display err.message verbatim.
+function translateAuthError(err, fallback) {
+  if (!(err instanceof ApiError)) return err?.message || fallback;
+  switch (err.code) {
+    case 'EMAIL_TAKEN':
+      return 'El email ya está registrado';
+    case 'INVALID_CREDENTIALS':
+      return 'Email o contraseña incorrectos';
+    case 'VALIDATION_FAILED': {
+      const first = err.issues?.[0];
+      if (first) {
+        const path = first.path?.join('.') || 'campo';
+        return `${path}: ${first.message}`;
+      }
+      return 'Datos inválidos';
+    }
+    case 'NETWORK_ERROR':
+      return 'No se pudo conectar con el servidor. Reintentá en un momento.';
+    default:
+      return fallback;
+  }
 }
 
 export function useSession() {
