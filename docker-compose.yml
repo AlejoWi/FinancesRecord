@@ -4,9 +4,29 @@ services:
       context: Front
       dockerfile: Dockerfile
     image: financesrecord-frontend:local
-    container_name: financesrecord-frontend
     ports:
       - "8080:80"
+    depends_on:
+      db:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: Back
+      dockerfile: Dockerfile
+    image: financesrecord-backend:local
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-finances_user}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-finances_db}
+      NODE_ENV: production
+      PORT: "3000"
+      # COOKIE_SECRET is required in production; ops must inject it.
+      # See Back/README.md for the generation command.
+      COOKIE_SECRET: ${COOKIE_SECRET:?COOKIE_SECRET must be set in production. See Back/README.md.}
+    expose:
+      - "3000"
     depends_on:
       db:
         condition: service_healthy

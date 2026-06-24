@@ -1,0 +1,30 @@
+{
+  "name": "financesrecord-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Fastify backend for FinancesRecord",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "vitest run",
+    "migrate": "node src/migrate.js"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^11",
+    "@fastify/cors": "^10",
+    "dotenv": "^16",
+    "fastify": "^5",
+    "pg": "^8",
+    "pino-pretty": "^11",
+    "zod": "^3"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "supertest": "^7",
+    "vitest": "^2"
+  }
+}
