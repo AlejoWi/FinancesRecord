@@ -41,7 +41,11 @@ export async function hashPassword(plain) {
   if (plain.length < 8) throw new RangeError('password must be at least 8 characters');
   if (plain.length > MAX_PASSWORD_LEN) throw new RangeError('password is too long');
   const salt = randomBytes(SALT_LEN);
-  const hash = await scrypt(plain, salt, KEY_LEN, { N, r, p });
+  // maxmem: 64 MiB. The scrypt cost for N=32768, r=8, p=1 is exactly
+  // 32 MiB; OpenSSL 3's default `maxmem` of 32 MiB has a strict `>`
+  // check that fails on the boundary. 64 MiB gives comfortable headroom
+  // without granting attacker-controlled memory pressure.
+  const hash = await scrypt(plain, salt, KEY_LEN, { N, r, p, maxmem: 64 * 1024 * 1024 });
   return formatHash({ salt, hash });
 }
 
@@ -59,7 +63,8 @@ export async function verifyPassword(plain, stored) {
   }
   let candidate;
   try {
-    candidate = await scrypt(plain, parsed.salt, parsed.hash.length, { N, r, p });
+    // maxmem must match hashPassword; see comment there.
+    candidate = await scrypt(plain, parsed.salt, parsed.hash.length, { N, r, p, maxmem: 64 * 1024 * 1024 });
   } catch {
     return false;
   }
