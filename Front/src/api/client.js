@@ -64,6 +64,18 @@ async function request(method, path, { body, headers, signal } = {}) {
   }
 
   if (!res.ok) {
+    // 401 UNAUTHENTICATED means the session is gone or invalid. Redirect
+    // to /login so the user can re-authenticate. We redirect only if
+    // we're not already on /login (the bootstrap GET /api/auth/me call
+    // also returns 401 for logged-out users, but navigating to /login
+    // is a no-op when the user is already there).
+    if (
+      res.status === 401 &&
+      typeof window !== 'undefined' &&
+      window.location.pathname !== '/login'
+    ) {
+      window.location.assign('/login');
+    }
     throw new ApiError({
       status: res.status,
       code: data?.error || 'HTTP_ERROR',

@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Toast } from './Toast.jsx';
 
 const ToastContext = createContext(null);
@@ -18,6 +18,23 @@ export function ToastProvider({ children }) {
     setToasts((cur) => [...cur, t]);
     return id;
   }, []);
+
+  // Listen for the `fr:wiped` event dispatched by api/wipe.js when the
+  // one-shot localStorage → backend migration runs on first login or
+  // register. Fires the toast so the user knows their session is
+  // linked to the backend.
+  useEffect(() => {
+    function onWiped(e) {
+      const { hadUsers, hadExpenses } = e.detail || {};
+      if (hadUsers || hadExpenses) {
+        show('Tus datos anteriores se migraron al backend');
+      } else {
+        show('Sesión vinculada al backend');
+      }
+    }
+    window.addEventListener('fr:wiped', onWiped);
+    return () => window.removeEventListener('fr:wiped', onWiped);
+  }, [show]);
 
   const value = useMemo(() => ({ show, dismiss }), [show, dismiss]);
 

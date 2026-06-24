@@ -27,10 +27,14 @@ export async function authRoutes(app) {
     const email = body.email;
     const existing = await app.pg.query(`SELECT id FROM users WHERE email = $1`, [email]);
     if (existing.rowCount > 0) {
-      // Constant-time: hash a dummy value before returning 409, so the
+      // Constant-time: hash a dummy value before returning, so the
       // timing matches the "new user" path. Prevents email enumeration.
+      // The error code + message are GENERIC (REGISTRATION_FAILED) — we
+      // must not reveal whether the email already exists. The 409 status
+      // tells the client the form was rejected; the body says nothing
+      // about the email.
       await hashPassword(body.password);
-      throw new ApiError({ code: 'EMAIL_TAKEN', message: 'Email is already registered', statusCode: 409 });
+      throw new ApiError({ code: 'REGISTRATION_FAILED', message: 'No fue posible completar el registro. Intentá nuevamente.', statusCode: 409 });
     }
     const passwordHash = await hashPassword(body.password);
     const inserted = await app.pg.query(
@@ -58,7 +62,10 @@ export async function authRoutes(app) {
     const hashToCheck = user ? user.password_hash : await getDummyHash();
     const ok = await verifyPassword(body.password, hashToCheck);
     if (!user || !ok) {
-      throw new ApiError({ code: 'INVALID_CREDENTIALS', message: 'Email or password is incorrect', statusCode: 401 });
+      // Generic error code + message; the user already submitted
+      // credentials so "email or password incorrect" doesn't leak
+      // whether the email exists (the response is the same for both).
+      throw new ApiError({ code: 'LOGIN_FAILED', message: 'Email o contraseña incorrectos', statusCode: 401 });
     }
     const { token } = await createSession(app.pg, user.id);
     reply.header('Set-Cookie', buildSessionCookie(token));

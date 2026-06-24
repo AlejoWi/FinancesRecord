@@ -77,9 +77,9 @@ export function SessionProvider({ children }) {
 function translateAuthError(err, fallback) {
   if (!(err instanceof ApiError)) return err?.message || fallback;
   switch (err.code) {
-    case 'EMAIL_TAKEN':
-      return 'El email ya está registrado';
-    case 'INVALID_CREDENTIALS':
+    case 'REGISTRATION_FAILED':
+      return 'No fue posible completar el registro. Intentá nuevamente.';
+    case 'LOGIN_FAILED':
       return 'Email o contraseña incorrectos';
     case 'VALIDATION_FAILED': {
       const first = err.issues?.[0];
