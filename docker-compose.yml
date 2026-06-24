@@ -1,7 +1,7 @@
 services:
   frontend:
     build:
-      context: .
+      context: Front
       dockerfile: Dockerfile
     image: financesrecord-frontend:local
     container_name: financesrecord-frontend
