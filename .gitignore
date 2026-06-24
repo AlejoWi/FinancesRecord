@@ -1,8 +1,31 @@
+# Repo-root ignores. Per-side ignores live next to each side:
+#   Front/.gitignore, Back/.gitignore (added when each side is scaffolded).
+#
+# The patterns below are not path-anchored, so they also match the same
+# names anywhere in the tree (e.g. Front/node_modules, Back/dist, Front/coverage).
+
+# Build artefacts and dependencies
 node_modules
 dist
+coverage
+*.log
+
+# Local env / secrets (real .env files; .env.example is intentionally tracked)
 .env
 .env.local
+.env.*.local
+
+# Editor / OS noise
 .DS_Store
-*.log
+Thumbs.db
+*.swp
+*.swo
+.vscode
+.idea
+
+# Tooling metadata (out of SDD scope but kept defensive)
 .atl
 
+# Future-proofing: engram mode does not use openspec/, but gitignoring it
+# keeps an accidental `openspec init` from polluting the repo.
+openspec

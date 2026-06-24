@@ -1,5 +1,6 @@
 # syntax=docker/dockerfile:1.6
-# Multi-stage build for FinancesRecord (React 18 + Vite SPA).
+# Multi-stage build for the FinancesRecord frontend (React 18 + Vite SPA).
+# Build context: Front/ (resolved by docker-compose.yml).
 # Stage 1: build the static bundle with Node.
 # Stage 2: serve the bundle with nginx and enable SPA fallback for React Router.
 
