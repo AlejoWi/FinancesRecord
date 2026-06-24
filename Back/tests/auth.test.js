@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import { buildApp } from '../src/server.js';
+import { buildApp } from '../src/buildApp.js';
 import { pool } from '../src/plugins/db.js';
 
 // Integration tests for /api/auth. These REQUIRE a real Postgres
