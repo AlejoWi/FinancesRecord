@@ -48,7 +48,7 @@ describe.skipIf(skip)('auth routes (integration)', () => {
     expect(res.headers['set-cookie']).toMatch(/fr_session=/);
   });
 
-  it('POST /api/auth/register with duplicate email returns 409 EMAIL_TAKEN (S-AUTH-02)', async () => {
+  it('POST /api/auth/register with duplicate email returns 409 REGISTRATION_FAILED (S-AUTH-02)', async () => {
     const email = uniqueEmail('dup');
     await app.inject({
       method: 'POST',
@@ -61,7 +61,7 @@ describe.skipIf(skip)('auth routes (integration)', () => {
       payload: { name: 'B', email, password: 'strong-pass-2' },
     });
     expect(res.statusCode).toBe(409);
-    expect(res.json().error).toBe('EMAIL_TAKEN');
+    expect(res.json().error).toBe('REGISTRATION_FAILED');
   });
 
   it('POST /api/auth/login with valid credentials returns user and cookie (S-AUTH-03)', async () => {
@@ -81,7 +81,7 @@ describe.skipIf(skip)('auth routes (integration)', () => {
     expect(res.headers['set-cookie']).toMatch(/fr_session=/);
   });
 
-  it('POST /api/auth/login with wrong password returns 401 INVALID_CREDENTIALS (S-AUTH-04)', async () => {
+  it('POST /api/auth/login with wrong password returns 401 LOGIN_FAILED (S-AUTH-04)', async () => {
     const email = uniqueEmail('wrong-pw');
     await app.inject({
       method: 'POST',
@@ -94,17 +94,17 @@ describe.skipIf(skip)('auth routes (integration)', () => {
       payload: { email, password: 'wrong-pass-1' },
     });
     expect(res.statusCode).toBe(401);
-    expect(res.json().error).toBe('INVALID_CREDENTIALS');
+    expect(res.json().error).toBe('LOGIN_FAILED');
   });
 
-  it('POST /api/auth/login with unknown email returns 401 INVALID_CREDENTIALS (S-AUTH-05)', async () => {
+  it('POST /api/auth/login with unknown email returns 401 LOGIN_FAILED (S-AUTH-05)', async () => {
     const res = await app.inject({
       method: 'POST',
       url: '/api/auth/login',
       payload: { email: uniqueEmail('ghost'), password: 'whatever-123' },
     });
     expect(res.statusCode).toBe(401);
-    expect(res.json().error).toBe('INVALID_CREDENTIALS');
+    expect(res.json().error).toBe('LOGIN_FAILED');
   });
 
   it('POST /api/auth/logout clears the session and returns 204 (S-AUTH-06)', async () => {

@@ -3,8 +3,8 @@
 //
 // Codes used in PR 3:
 //   VALIDATION_FAILED      (zod issue → 400)
-//   EMAIL_TAKEN            (register, 409)
-//   INVALID_CREDENTIALS    (login, 401)
+//   REGISTRATION_FAILED    (register, 409 — generic, prevents email enumeration)
+//   LOGIN_FAILED           (login, 401 — same shape on wrong-pwd and unknown-email)
 //   PASSWORD_TOO_SHORT     (register, 400)
 //   NAME_TOO_LONG          (register, 400)
 //   UNAUTHENTICATED        (me, 401)

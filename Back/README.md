@@ -27,8 +27,8 @@ All auth endpoints exchange JSON and set the `fr_session` cookie on success. The
 
 | Method | Path                  | Body                                       | Success                         | Failure codes                                                |
 |--------|-----------------------|--------------------------------------------|---------------------------------|--------------------------------------------------------------|
-| POST   | `/api/auth/register`  | `{ name, email, password }`                | `201` + `{ user }` + cookie     | `409 EMAIL_TAKEN`, `400 VALIDATION_FAILED`, `400 PASSWORD_TOO_SHORT` |
-| POST   | `/api/auth/login`     | `{ email, password }`                      | `200` + `{ user }` + cookie     | `401 INVALID_CREDENTIALS` (constant-time)                    |
+| POST   | `/api/auth/register`  | `{ name, email, password }`                | `201` + `{ user }` + cookie     | `409 REGISTRATION_FAILED`, `400 VALIDATION_FAILED`, `400 PASSWORD_TOO_SHORT` |
+| POST   | `/api/auth/login`     | `{ email, password }`                      | `200` + `{ user }` + cookie     | `401 LOGIN_FAILED` (constant-time)                            |
 | POST   | `/api/auth/logout`    | (empty)                                    | `204` + clears cookie           | (none — always 204 even without a session)                   |
 | GET    | `/api/auth/me`        | (none)                                     | `200` + `{ user }`              | `401 UNAUTHENTICATED`                                        |
 
