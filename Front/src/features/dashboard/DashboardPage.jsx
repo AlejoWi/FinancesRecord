@@ -1,110 +1,94 @@
-import { useMemo, useState } from 'react';
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { useSession } from '../../store/SessionContext.jsx';
-import { getUserExpenses } from '../../db/localStore.js';
-import { CATEGORIES, categoryName } from '../../db/categories.js';
+import { useEffect, useState } from 'react';
+import { api, ApiError } from '../../api/client.js';
 
-const PERIODS = [
-  { id: 'current', label: 'Mes actual' },
-  { id: 'previous', label: 'Mes anterior' },
-  { id: 'year', label: 'Año' },
-];
-
-function formatCurrency(n) {
+function formatAmount(n) {
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(n);
 }
 
-function periodRange(period) {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = now.getMonth();
-  if (period === 'current') {
-    return {
-      from: new Date(y, m, 1),
-      to: new Date(y, m + 1, 0, 23, 59, 59, 999),
-    };
-  }
-  if (period === 'previous') {
-    return {
-      from: new Date(y, m - 1, 1),
-      to: new Date(y, m, 0, 23, 59, 59, 999),
-    };
-  }
-  // year
-  return {
-    from: new Date(y, 0, 1),
-    to: new Date(y, 11, 31, 23, 59, 59, 999),
-  };
-}
-
-function withinRange(dateIso, from, to) {
-  const d = new Date(`${dateIso}T00:00:00`);
-  return d >= from && d <= to;
-}
+const PERIODS = [
+  { value: 'current_month', label: 'Este mes' },
+  { value: 'previous_month', label: 'Mes anterior' },
+  { value: 'year', label: 'Año' },
+];
 
 export function DashboardPage() {
-  const { user } = useSession();
-  const [period, setPeriod] = useState('current');
+  const [period, setPeriod] = useState('current_month');
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const { total, byCategory } = useMemo(() => {
-    const { from, to } = periodRange(period);
-    const all = getUserExpenses(user.id);
-    const inRange = all.filter((e) => withinRange(e.expense_date, from, to));
-    const t = inRange.reduce((acc, e) => acc + Number(e.amount), 0);
-    const byCat = CATEGORIES.map((c) => ({
-      category: c.name,
-      total: inRange
-        .filter((e) => e.category_id === c.id)
-        .reduce((acc, e) => acc + Number(e.amount), 0),
-    }));
-    return { total: t, byCategory: byCat };
-  }, [user.id, period]);
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    api
+      .get(`/api/dashboard?period=${period}`)
+      .then((d) => { if (!cancelled) setData(d); })
+      .catch((err) => {
+        if (cancelled) return;
+        setError(err?.message || 'No se pudo cargar el dashboard');
+      })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [period]);
+
+  if (error) return <p className="form__error">{error}</p>;
 
   return (
-    <section className="page">
-      <header className="page__header">
-        <h1>Dashboard</h1>
-        <div className="period-switch">
-          {PERIODS.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              className={`btn ${period === p.id ? 'btn--primary' : 'btn--ghost'}`}
-              onClick={() => setPeriod(p.id)}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-      </header>
-
-      <div className="cards">
-        <article className="card">
-          <h2 className="card__title">Total del período</h2>
-          <p className="card__value">{formatCurrency(total)}</p>
-        </article>
-        {byCategory.map((c) => (
-          <article key={c.category} className="card">
-            <h2 className="card__title">{c.category}</h2>
-            <p className="card__value">{formatCurrency(c.total)}</p>
-          </article>
-        ))}
-      </div>
-
-      <div className="chart">
-        <h2>Gastos por categoría</h2>
-        <div className="chart__inner">
-          <ResponsiveContainer width="100%" height={320}>
-            <BarChart data={byCategory}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="category" />
-              <YAxis />
-              <Tooltip formatter={(value) => formatCurrency(value)} />
-              <Bar dataKey="total" fill="#4f46e5" radius={[6, 6, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+    <div className="dashboard">
+      <div className="dashboard__header">
+        <h1>Resumen</h1>
+        <div className="field">
+          <label htmlFor="period">Período</label>
+          <select id="period" value={period} onChange={(e) => setPeriod(e.target.value)}>
+            {PERIODS.map((p) => (
+              <option key={p.value} value={p.value}>{p.label}</option>
+            ))}
+          </select>
         </div>
       </div>
-    </section>
+
+      {loading || !data ? (
+        <p>Cargando…</p>
+      ) : (
+        <>
+          <p className="dashboard__total">
+            Total: <strong>{formatAmount(data.total)}</strong>
+            <span className="dashboard__range">
+              {data.range.from} → {data.range.to}
+            </span>
+          </p>
+
+          <h2>Por categoría</h2>
+          {data.byCategory.length === 0 ? (
+            <p>Sin gastos en el período.</p>
+          ) : (
+            <ul className="dashboard__categories">
+              {data.byCategory.map((c) => (
+                <li key={c.categoryId}>
+                  <span className="dashboard__cat-name">{c.name}</span>
+                  <span className="dashboard__cat-bar" style={{ width: `${(c.total / data.total) * 100}%` }} />
+                  <span className="dashboard__cat-amount">{formatAmount(c.total)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {data.byMonth.length > 0 && (
+            <>
+              <h2>Por mes</h2>
+              <ul className="dashboard__months">
+                {data.byMonth.map((m) => (
+                  <li key={m.month}>
+                    <span>{m.month}</span>
+                    <strong>{formatAmount(m.total)}</strong>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </>
+      )}
+    </div>
   );
 }
