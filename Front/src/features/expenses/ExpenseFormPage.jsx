@@ -4,7 +4,6 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { expenseSchema } from '../../validations/expense.js';
 import { api, ApiError } from '../../api/client.js';
-// NOTE: see ExpensesListPage for the import-during-deletion comment.
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
@@ -121,10 +120,23 @@ export function ExpenseFormPage({ mode }) {
     [categories],
   );
 
-  if (loading) return <p>Cargando…</p>;
+  if (loading) {
+    return (
+      <div className="expense-form" aria-busy="true" aria-live="polite">
+        <span className="skeleton skeleton--line" style={{ width: 120, height: 22 }} />
+        <span className="skeleton skeleton--block" style={{ marginTop: 8 }} />
+        <span className="skeleton skeleton--block" />
+        <span className="skeleton skeleton--block" />
+        <span className="skeleton skeleton--block" />
+      </div>
+    );
+  }
 
   return (
     <div className="expense-form">
+      <Link to="/expenses" className="expense-form__back">
+        <span aria-hidden="true">←</span> Volver a gastos
+      </Link>
       <h1>{isEdit ? 'Editar gasto' : 'Nuevo gasto'}</h1>
       <form onSubmit={handleSubmit(onSubmit)} noValidate>
         <div className="field">
@@ -152,17 +164,17 @@ export function ExpenseFormPage({ mode }) {
           <input id="description" type="text" maxLength={255} {...register('description')} />
           {errors.description && <p className="field__error">{errors.description.message}</p>}
         </div>
-        {submitError && <p className="form__error">{submitError}</p>}
+        {submitError && <p className="form__error" role="alert">{submitError}</p>}
         <div className="form__actions">
-          <button type="submit" className="btn btn--primary" disabled={isSubmitting}>
-            {isSubmitting ? 'Guardando…' : isEdit ? 'Guardar cambios' : 'Crear gasto'}
-          </button>
+          <Link to="/expenses" className="btn btn--secondary">Cancelar</Link>
           {isEdit && (
             <button type="button" className="btn btn--danger" onClick={onDelete} disabled={deleting}>
               {deleting ? 'Eliminando…' : 'Eliminar'}
             </button>
           )}
-          <Link to="/expenses" className="btn btn--secondary">Cancelar</Link>
+          <button type="submit" className="btn btn--primary" disabled={isSubmitting}>
+            {isSubmitting ? 'Guardando…' : isEdit ? 'Guardar cambios' : 'Crear gasto'}
+          </button>
         </div>
       </form>
     </div>
