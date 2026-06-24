@@ -4,7 +4,6 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { expenseSchema } from '../../validations/expense.js';
 import { api, ApiError } from '../../api/client.js';
-import { CATEGORY_BY_ID } from '../../db/categories.js';
 // NOTE: see ExpensesListPage for the import-during-deletion comment.
 
 function todayISO() {
@@ -118,7 +117,7 @@ export function ExpenseFormPage({ mode }) {
   }
 
   const categoryOptions = useMemo(
-    () => (categories.length > 0 ? categories : Object.values(CATEGORY_BY_ID).map((c) => ({ id: c.id, name: c.name }))),
+    () => categories ?? [],
     [categories],
   );
 

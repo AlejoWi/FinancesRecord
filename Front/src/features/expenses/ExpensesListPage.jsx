@@ -1,12 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, ApiError } from '../../api/client.js';
-import { CATEGORY_BY_ID } from '../../db/categories.js';
-// NOTE: src/db/categories.js will be DELETED in commit 8. Keep the
-// import here for now (commit 5 is a refactor, not a delete). The
-// next page rewrites (commits 6, 7) also keep it. The deletion in
-// commit 8 makes all these imports fail, which is intended — by then
-// every page should have been rewired to use the API's category list.
+import { fetchCategories } from '../../api/categories.js';
 
 function formatAmount(n) {
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(n);
@@ -20,6 +15,7 @@ function formatDate(iso) {
 
 export function ExpensesListPage() {
   const [expenses, setExpenses] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filterCategory, setFilterCategory] = useState('');
@@ -35,10 +31,14 @@ export function ExpensesListPage() {
     if (filterFrom) params.set('from', filterFrom);
     if (filterTo) params.set('to', filterTo);
     const qs = params.toString();
-    api
-      .get(`/api/expenses${qs ? `?${qs}` : ''}`)
-      .then((data) => {
-        if (!cancelled) setExpenses(data.expenses);
+    Promise.all([
+      api.get(`/api/expenses${qs ? `?${qs}` : ''}`),
+      fetchCategories(),
+    ])
+      .then(([expData, cats]) => {
+        if (cancelled) return;
+        setExpenses(expData.expenses);
+        setCategories(cats);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -82,7 +82,7 @@ export function ExpensesListPage() {
           <label htmlFor="cat">Categoría</label>
           <select id="cat" value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
             <option value="">Todas</option>
-            {Object.values(CATEGORY_BY_ID).map((c) => (
+            {categories.map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
@@ -119,7 +119,7 @@ export function ExpensesListPage() {
               {expenses.map((e) => (
                 <tr key={e.id}>
                   <td>{formatDate(e.expenseDate)}</td>
-                  <td>{CATEGORY_BY_ID[e.categoryId]?.name ?? 'Desconocida'}</td>
+                  <td>{categories.find((c) => c.id === e.categoryId)?.name ?? 'Desconocida'}</td>
                   <td>{e.description || '—'}</td>
                   <td className="num">{formatAmount(Number(e.amount))}</td>
                   <td className="actions">
