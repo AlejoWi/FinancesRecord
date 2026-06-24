@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { api, ApiError } from '../api/client.js';
+import { runWipeIfNeeded } from '../api/wipe.js';
 
 const SessionContext = createContext(null);
 
@@ -33,6 +34,7 @@ export function SessionProvider({ children }) {
   const register = useCallback(async ({ name, email, password }) => {
     try {
       const { user } = await api.post('/api/auth/register', { name, email, password });
+      runWipeIfNeeded(); // fire-and-forget; logs to console if localStorage is unavailable
       setUser(user);
       return user;
     } catch (err) {
@@ -43,6 +45,7 @@ export function SessionProvider({ children }) {
   const login = useCallback(async ({ email, password }) => {
     try {
       const { user } = await api.post('/api/auth/login', { email, password });
+      runWipeIfNeeded(); // fire-and-forget; logs to console if localStorage is unavailable
       setUser(user);
       return user;
     } catch (err) {
