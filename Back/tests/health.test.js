@@ -1,5 +1,5 @@
 import { describe, it, expect, afterAll } from 'vitest';
-import { buildApp } from '../src/server.js';
+import { buildApp } from '../src/buildApp.js';
 
 describe('health routes', () => {
   const apps = [];

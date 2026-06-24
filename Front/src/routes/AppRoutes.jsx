@@ -8,13 +8,25 @@ import { ExpensesListPage } from '../features/expenses/ExpensesListPage.jsx';
 import { ExpenseFormPage } from '../features/expenses/ExpenseFormPage.jsx';
 
 function PrivateRoute({ children }) {
-  const { isAuthenticated } = useSession();
+  const { isAuthenticated, bootstrapping } = useSession();
+  // Wait for the cookie check to finish before deciding. Avoids a /login
+  // flash for users with a valid session cookie.
+  if (bootstrapping) return <RouteFallback />;
   return isAuthenticated ? children : <Navigate to="/login" replace />;
 }
 
 function PublicOnlyRoute({ children }) {
-  const { isAuthenticated } = useSession();
+  const { isAuthenticated, bootstrapping } = useSession();
+  if (bootstrapping) return <RouteFallback />;
   return isAuthenticated ? <Navigate to="/dashboard" replace /> : children;
+}
+
+function RouteFallback() {
+  return (
+    <div className="auth">
+      <div className="auth__card"><p>Cargando…</p></div>
+    </div>
+  );
 }
 
 export function AppRoutes() {

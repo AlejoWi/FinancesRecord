@@ -1,6 +1,6 @@
 # Back/
 
-Fastify backend for FinancesRecord. Implements user auth (PR 3), expense CRUD + categories + dashboard (PR 4), and a localStorage migration hook (PR 4). PR 2 ships only the skeleton: `/healthz`, `/readyz`, the pg pool, the SQL migrate loop, and the docker-compose wiring.
+Fastify backend for FinancesRecord. Implements user auth (PR 3 — shipped), expense CRUD + categories + dashboard + localStorage migration (PR 4 — pending). PR 2 shipped the skeleton: `/healthz`, `/readyz`, the pg pool, the SQL migrate loop, and the docker-compose wiring.
 
 ## Requirements
 - Node.js 20+
@@ -20,6 +20,23 @@ npm --prefix Back run dev
 The server binds to `0.0.0.0:3000`. Health endpoints:
 - `curl http://localhost:3000/healthz` → 200 always (no DB call)
 - `curl http://localhost:3000/readyz`  → 200 if `SELECT 1` succeeds, 503 otherwise
+
+## Auth endpoints (PR 3)
+
+All auth endpoints exchange JSON and set the `fr_session` cookie on success. The cookie is `HttpOnly` + `SameSite=Lax` always; `Secure` only when `NODE_ENV=production`. TTL: 7 days, sliding (extended on each authenticated request).
+
+| Method | Path                  | Body                                       | Success                         | Failure codes                                                |
+|--------|-----------------------|--------------------------------------------|---------------------------------|--------------------------------------------------------------|
+| POST   | `/api/auth/register`  | `{ name, email, password }`                | `201` + `{ user }` + cookie     | `409 EMAIL_TAKEN`, `400 VALIDATION_FAILED`, `400 PASSWORD_TOO_SHORT` |
+| POST   | `/api/auth/login`     | `{ email, password }`                      | `200` + `{ user }` + cookie     | `401 INVALID_CREDENTIALS` (constant-time)                    |
+| POST   | `/api/auth/logout`    | (empty)                                    | `204` + clears cookie           | (none — always 204 even without a session)                   |
+| GET    | `/api/auth/me`        | (none)                                     | `200` + `{ user }`              | `401 UNAUTHENTICATED`                                        |
+
+All error responses use the spec envelope: `{ "error": "CODE", "message": "...", "requestId": "..." }`. Validation errors additionally include `issues: [{ path, message, code }]`.
+
+Password storage uses `node:crypto.scrypt` with `N=32768, r=8, p=1, maxmem=64 MiB`. The on-disk format is `scrypt$N=32768,r=8,p=1$<saltHex>$<hashHex>`, stored in `users.password_hash` (VARCHAR(255)).
+
+Sessions are stored server-side in the `sessions` table (see `db/03_sessions.sql`). The cookie carries an opaque random token; the server stores only its SHA-256 hash, so a DB compromise does not leak valid session tokens.
 
 ## Migrate the schema
 
